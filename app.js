@@ -62,7 +62,7 @@ ingestApp.post('/ingest', mtlsAuth, apiKeyAuth, async (req, res) => {
 
     const point = new Point(measurement)
       .floatField('value', parseFloat(value))
-      .tag('device_eui', tag);
+      .tag('tag', tag);
 
     writeApi.writePoint(point);
     await writeApi.flush();
@@ -71,6 +71,31 @@ ingestApp.post('/ingest', mtlsAuth, apiKeyAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'write failed' });
+  }
+});
+
+ingestApp.post('/ingest/mock', mtlsAuth, apiKeyAuth, async (req, res) => {
+  try {
+    const { measurement, value, tag, timestamp } = req.body;
+
+    if (!measurement || value === undefined || !tag || !timestamp) {
+      return res.status(400).json({ error: 'measurement, value, tag and timestamp are required for mock data' });
+    }
+
+    const date = new Date(timestamp);
+
+    const point = new Point(measurement)
+      .floatField('value', parseFloat(value))
+      .tag('tag', tag)
+      .timestamp(date);
+      
+    writeApi.writePoint(point);
+    await writeApi.flush();
+
+    res.json({ status: 'mock written' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'mock write failed' });
   }
 });
 
