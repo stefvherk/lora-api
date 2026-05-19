@@ -11,7 +11,7 @@ ingestApp.use(express.json());
 outputApp.use(express.json());
 
 // --CONFIG--
-const token = process.env.TOKEN;
+const token = process.env.INFLUX_TOKEN;
 const url = process.env.INFLUX_URL;
 const org = process.env.INFLUX_ORG;
 const bucket = process.env.INFLUX_BUCKET;
