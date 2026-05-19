@@ -4,8 +4,11 @@ const https = require('https');
 const express = require('express');
 const { InfluxDB, Point } = require('@influxdata/influxdb-client');
 
-const app = express();
-app.use(express.json());
+const ingestApp = express();
+const outputApp = express();
+
+ingestApp.use(express.json());
+outputApp.use(express.json());
 
 // --CONFIG--
 const token = process.env.TOKEN;
@@ -49,7 +52,7 @@ function mtlsAuth(req, res, next) {
 }
 
 // Routes
-app.post('/ingest', mtlsAuth, apiKeyAuth, async (req, res) => {
+ingestApp.post('/ingest', mtlsAuth, apiKeyAuth, async (req, res) => {
   try {
     const { measurement, value, tag } = req.body;
 
@@ -71,7 +74,7 @@ app.post('/ingest', mtlsAuth, apiKeyAuth, async (req, res) => {
   }
 });
 
-app.get('/output', apiKeyAuth, async (req, res) => {
+outputApp.get('/output', apiKeyAuth, async (req, res) => {
   const query = `
     from(bucket: "${bucket}")
       |> range(start: 0)
@@ -86,7 +89,7 @@ app.get('/output', apiKeyAuth, async (req, res) => {
   }
 });
 
-app.get('/output/24h', apiKeyAuth, async (req, res) => {
+outputApp.get('/output/24h', apiKeyAuth, async (req, res) => {
   const query = `
     from(bucket: "${bucket}")
       |> range(start: -24h)
@@ -105,19 +108,26 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// HTTPS + mTLS config
-const httpsOptions = {
+const mtlsOptions = {
   key: fs.readFileSync('./certs/server.key'),
   cert: fs.readFileSync('./certs/server.crt'),
   ca: fs.readFileSync('./certs/ca.crt'),
-
   requestCert: true,
   rejectUnauthorized: true
 };
 
-// Run HTTPS server
-const PORT = process.env.PORT || 3000;
+const httpsOptions = {
+  key: fs.readFileSync('./certs/server.key'),
+  cert: fs.readFileSync('./certs/server.crt')
+};
 
-https.createServer(httpsOptions, app).listen(PORT, () => {
-  console.log(`API running on HTTPS port ${PORT}`);
+const MTLS_PORT = process.env.MTLS_PORT;
+const OUTPUT_PORT = process.env.OUTPUT_PORT;
+
+https.createServer(mtlsOptions, ingestApp).listen(MTLS_PORT, () => {
+  console.log(`mTLS ingest API running on HTTPS port ${MTLS_PORT}`);
+});
+
+https.createServer(httpsOptions, outputApp).listen(OUTPUT_PORT, () => {
+  console.log(`HTTPS output API running on HTTPS port ${OUTPUT_PORT}`);
 });
