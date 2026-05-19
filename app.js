@@ -104,7 +104,7 @@ outputApp.get('/output/24h', apiKeyAuth, async (req, res) => {
   }
 });
 
-app.get('/health', (req, res) => {
+outputApp.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
