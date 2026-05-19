@@ -54,15 +54,16 @@ function mtlsAuth(req, res, next) {
 // Routes
 ingestApp.post('/ingest', mtlsAuth, apiKeyAuth, async (req, res) => {
   try {
-    const { measurement, value, tag } = req.body;
+    const { EUI, temp, moisture } = req.body;
 
-    if (!measurement || value === undefined) {
-      return res.status(400).json({ error: 'measurement and value required' });
+    if (!EUI || temp === undefined || moisture === undefined) {
+      return res.status(400).json({ error: 'EUI, temp, and moisture are required' });
     }
 
-    const point = new Point(measurement)
-      .floatField('value', value)
-      .tag('source', tag || 'default');
+    const point = new Point('sensor_data')
+      .floatField('temp', parseFloat(temp))
+      .floatField('moisture', parseFloat(moisture))
+      .tag('EUI', EUI);
 
     writeApi.writePoint(point);
     await writeApi.flush();
