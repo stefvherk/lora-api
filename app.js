@@ -54,16 +54,15 @@ function mtlsAuth(req, res, next) {
 // Routes
 ingestApp.post('/ingest', mtlsAuth, apiKeyAuth, async (req, res) => {
   try {
-    const { EUI, temp, moisture } = req.body;
+    const { measurement, value, tag } = req.body;
 
-    if (!EUI || temp === undefined || moisture === undefined) {
-      return res.status(400).json({ error: 'EUI, temp, and moisture are required' });
+    if (!measurement || value === undefined || !tag) {
+      return res.status(400).json({ error: 'measurement, value, and tag are required' });
     }
 
-    const point = new Point('sensor_data')
-      .floatField('temp', parseFloat(temp))
-      .floatField('moisture', parseFloat(moisture))
-      .tag('EUI', EUI);
+    const point = new Point(measurement)
+      .floatField('value', parseFloat(value))
+      .tag('device_eui', tag);
 
     writeApi.writePoint(point);
     await writeApi.flush();
@@ -76,24 +75,15 @@ ingestApp.post('/ingest', mtlsAuth, apiKeyAuth, async (req, res) => {
 });
 
 outputApp.get('/output', apiKeyAuth, async (req, res) => {
-  const query = `
-    from(bucket: "${bucket}")
-      |> range(start: 0)
-  `;
+  const { from, to } = req.query;
 
-  try {
-    const rows = await queryApi.collectRows(query);
-    res.json(rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'query failed' });
+  if (!from || !to) {
+    return res.status(400).json({ error: 'from and to query parameters are required' });
   }
-});
 
-outputApp.get('/output/24h', apiKeyAuth, async (req, res) => {
   const query = `
     from(bucket: "${bucket}")
-      |> range(start: -24h)
+      |> range(start: ${from}, stop: ${to})
   `;
 
   try {
