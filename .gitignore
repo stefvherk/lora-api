@@ -1,0 +1,6 @@
+.env
+certs
+certs/*
+node_modules/
+nohup.out
+*.log
