@@ -56,13 +56,41 @@ ingestApp.post('/ingest', mtlsAuth, apiKeyAuth, async (req, res) => {
   try {
     const { measurement, value, tag, humidity, movement } = req.body;
 
-    if (!measurement || value === undefined || !tag) {
-      return res.status(400).json({ error: 'measurement, value, and tag are required' });
+    if (!measurement || !tag) {
+      return res.status(400).json({ error: 'measurement and tag are required' });
     }
 
-    const point = new Point(measurement)
-      .floatField('value', parseFloat(value))
-      .tag('tag', tag);
+    const point = new Point(measurement).tag('tag', tag);
+
+    const parseBoolean = (input) => {
+      if (typeof input === 'boolean') return input;
+      if (input === 'true') return true;
+      if (input === 'false') return false;
+      return undefined;
+    };
+
+    if (measurement === 'movement') {
+      const movementValue = movement !== undefined
+        ? parseBoolean(movement)
+        : parseBoolean(value);
+
+      if (movementValue === undefined) {
+        return res.status(400).json({ error: 'movement measurement requires a boolean movement value' });
+      }
+
+      point.booleanField('movement', movementValue);
+    } else {
+      if (value === undefined) {
+        return res.status(400).json({ error: 'measurement, value, and tag are required' });
+      }
+
+      const numericValue = parseFloat(value);
+      if (Number.isNaN(numericValue)) {
+        return res.status(400).json({ error: 'value must be numeric' });
+      }
+
+      point.floatField('value', numericValue);
+    }
 
     if (humidity !== undefined) {
       const humidityValue = parseFloat(humidity);
@@ -70,20 +98,6 @@ ingestApp.post('/ingest', mtlsAuth, apiKeyAuth, async (req, res) => {
         return res.status(400).json({ error: 'humidity must be a percentage between 0 and 100' });
       }
       point.floatField('humidity', humidityValue);
-    }
-
-    if (movement !== undefined) {
-      const movementValue = typeof movement === 'boolean'
-        ? movement
-        : movement === 'true' || movement === 'false'
-          ? movement === 'true'
-          : undefined;
-
-      if (movementValue === undefined) {
-        return res.status(400).json({ error: 'movement must be boolean' });
-      }
-
-      point.booleanField('movement', movementValue);
     }
 
     writeApi.writePoint(point);
@@ -100,16 +114,45 @@ ingestApp.post('/ingest/mock', mtlsAuth, apiKeyAuth, async (req, res) => {
   try {
     const { measurement, value, tag, timestamp, humidity, movement } = req.body;
 
-    if (!measurement || value === undefined || !tag || !timestamp) {
-      return res.status(400).json({ error: 'measurement, value, tag and timestamp are required for mock data' });
+    if (!measurement || !tag || !timestamp) {
+      return res.status(400).json({ error: 'measurement, tag and timestamp are required for mock data' });
     }
 
     const date = new Date(timestamp);
 
     const point = new Point(measurement)
-      .floatField('value', parseFloat(value))
       .tag('tag', tag)
       .timestamp(date);
+
+    const parseBoolean = (input) => {
+      if (typeof input === 'boolean') return input;
+      if (input === 'true') return true;
+      if (input === 'false') return false;
+      return undefined;
+    };
+
+    if (measurement === 'movement') {
+      const movementValue = movement !== undefined
+        ? parseBoolean(movement)
+        : parseBoolean(value);
+
+      if (movementValue === undefined) {
+        return res.status(400).json({ error: 'movement measurement requires a boolean movement value' });
+      }
+
+      point.booleanField('movement', movementValue);
+    } else {
+      if (value === undefined) {
+        return res.status(400).json({ error: 'measurement, value, tag and timestamp are required for mock data' });
+      }
+
+      const numericValue = parseFloat(value);
+      if (Number.isNaN(numericValue)) {
+        return res.status(400).json({ error: 'value must be numeric' });
+      }
+
+      point.floatField('value', numericValue);
+    }
 
     if (humidity !== undefined) {
       const humidityValue = parseFloat(humidity);
@@ -117,20 +160,6 @@ ingestApp.post('/ingest/mock', mtlsAuth, apiKeyAuth, async (req, res) => {
         return res.status(400).json({ error: 'humidity must be a percentage between 0 and 100' });
       }
       point.floatField('humidity', humidityValue);
-    }
-
-    if (movement !== undefined) {
-      const movementValue = typeof movement === 'boolean'
-        ? movement
-        : movement === 'true' || movement === 'false'
-          ? movement === 'true'
-          : undefined;
-
-      if (movementValue === undefined) {
-        return res.status(400).json({ error: 'movement must be boolean' });
-      }
-
-      point.booleanField('movement', movementValue);
     }
       
     writeApi.writePoint(point);
