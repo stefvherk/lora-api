@@ -54,7 +54,7 @@ function mtlsAuth(req, res, next) {
 // Routes
 ingestApp.post('/ingest', mtlsAuth, apiKeyAuth, async (req, res) => {
   try {
-    const { measurement, value, tag } = req.body;
+    const { measurement, value, tag, humidity, movement } = req.body;
 
     if (!measurement || value === undefined || !tag) {
       return res.status(400).json({ error: 'measurement, value, and tag are required' });
@@ -63,6 +63,28 @@ ingestApp.post('/ingest', mtlsAuth, apiKeyAuth, async (req, res) => {
     const point = new Point(measurement)
       .floatField('value', parseFloat(value))
       .tag('tag', tag);
+
+    if (humidity !== undefined) {
+      const humidityValue = parseFloat(humidity);
+      if (Number.isNaN(humidityValue) || humidityValue < 0 || humidityValue > 100) {
+        return res.status(400).json({ error: 'humidity must be a percentage between 0 and 100' });
+      }
+      point.floatField('humidity', humidityValue);
+    }
+
+    if (movement !== undefined) {
+      const movementValue = typeof movement === 'boolean'
+        ? movement
+        : movement === 'true' || movement === 'false'
+          ? movement === 'true'
+          : undefined;
+
+      if (movementValue === undefined) {
+        return res.status(400).json({ error: 'movement must be boolean' });
+      }
+
+      point.booleanField('movement', movementValue);
+    }
 
     writeApi.writePoint(point);
     await writeApi.flush();
@@ -76,7 +98,7 @@ ingestApp.post('/ingest', mtlsAuth, apiKeyAuth, async (req, res) => {
 
 ingestApp.post('/ingest/mock', mtlsAuth, apiKeyAuth, async (req, res) => {
   try {
-    const { measurement, value, tag, timestamp } = req.body;
+    const { measurement, value, tag, timestamp, humidity, movement } = req.body;
 
     if (!measurement || value === undefined || !tag || !timestamp) {
       return res.status(400).json({ error: 'measurement, value, tag and timestamp are required for mock data' });
@@ -88,6 +110,28 @@ ingestApp.post('/ingest/mock', mtlsAuth, apiKeyAuth, async (req, res) => {
       .floatField('value', parseFloat(value))
       .tag('tag', tag)
       .timestamp(date);
+
+    if (humidity !== undefined) {
+      const humidityValue = parseFloat(humidity);
+      if (Number.isNaN(humidityValue) || humidityValue < 0 || humidityValue > 100) {
+        return res.status(400).json({ error: 'humidity must be a percentage between 0 and 100' });
+      }
+      point.floatField('humidity', humidityValue);
+    }
+
+    if (movement !== undefined) {
+      const movementValue = typeof movement === 'boolean'
+        ? movement
+        : movement === 'true' || movement === 'false'
+          ? movement === 'true'
+          : undefined;
+
+      if (movementValue === undefined) {
+        return res.status(400).json({ error: 'movement must be boolean' });
+      }
+
+      point.booleanField('movement', movementValue);
+    }
       
     writeApi.writePoint(point);
     await writeApi.flush();
@@ -113,15 +157,34 @@ outputApp.get('/output', apiKeyAuth, async (req, res) => {
 
   try {
     const rows = await queryApi.collectRows(query);
-    const cleaned = rows
-      .filter(r => r._field === 'value' || r._value !== undefined)
-      .map(r => ({
-        measurement: r._measurement,
-        value: typeof r._value === 'string' ? parseFloat(r._value) : r._value,
-        tag: r.tag,
-        time: r._time
-      }));
+    const pointsByKey = {};
 
+    rows.forEach(r => {
+      if (r._value === undefined) {
+        return;
+      }
+
+      const key = `${r._measurement}-${r.tag}-${r._time}`;
+      if (!pointsByKey[key]) {
+        pointsByKey[key] = {
+          measurement: r._measurement,
+          tag: r.tag,
+          time: r._time
+        };
+      }
+
+      const cleanedValue = typeof r._value === 'string' ? parseFloat(r._value) : r._value;
+
+      if (r._field === 'value') {
+        pointsByKey[key].value = cleanedValue;
+      } else if (r._field === 'humidity') {
+        pointsByKey[key].humidity = cleanedValue;
+      } else if (r._field === 'movement') {
+        pointsByKey[key].movement = cleanedValue;
+      }
+    });
+
+    const cleaned = Object.values(pointsByKey);
     res.json(cleaned);
   } catch (err) {
     console.error(err);
