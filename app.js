@@ -113,7 +113,16 @@ outputApp.get('/output', apiKeyAuth, async (req, res) => {
 
   try {
     const rows = await queryApi.collectRows(query);
-    res.json(rows);
+    const cleaned = rows
+      .filter(r => r._field === 'value' || r._value !== undefined)
+      .map(r => ({
+        measurement: r._measurement,
+        value: typeof r._value === 'string' ? parseFloat(r._value) : r._value,
+        tag: r.tag,
+        time: r._time
+      }));
+
+    res.json(cleaned);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'query failed' });
