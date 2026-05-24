@@ -209,7 +209,11 @@ outputApp.get('/output', apiKeyAuth, async (req, res) => {
       } else if (r._field === 'humidity') {
         pointsByKey[key].humidity = cleanedValue;
       } else if (r._field === 'movement') {
-        pointsByKey[key].movement = cleanedValue;
+        if (r._measurement === 'movement') {
+          pointsByKey[key].value = cleanedValue;
+        } else {
+          pointsByKey[key].movement = cleanedValue;
+        }
       }
     });
 
