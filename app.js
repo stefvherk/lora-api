@@ -173,15 +173,30 @@ ingestApp.post('/ingest/mock', mtlsAuth, apiKeyAuth, async (req, res) => {
 });
 
 outputApp.get('/output', apiKeyAuth, async (req, res) => {
-  const { from, to } = req.query;
+  const { from, to, eui } = req.query;
 
   if (!from || !to) {
     return res.status(400).json({ error: 'from and to query parameters are required' });
   }
 
+  const euiFilter = Array.isArray(eui) ? eui.join(',') : eui;
+  const euis = euiFilter
+    ? euiFilter.split(',').map(value => value.trim()).filter(Boolean)
+    : [];
+
+  if (eui !== undefined && euis.length === 0) {
+    return res.status(400).json({ error: 'eui query parameter must contain at least one EUI' });
+  }
+
+  const escapeFluxString = value => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const euiQueryFilter = euis.length > 0
+    ? `\n      |> filter(fn: (r) => contains(value: r.tag, set: [${euis.map(value => `"${escapeFluxString(value)}"`).join(', ')}]))`
+    : '';
+
   const query = `
     from(bucket: "${bucket}")
       |> range(start: ${from}, stop: ${to})
+${euiQueryFilter}
   `;
 
   try {
