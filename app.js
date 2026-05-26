@@ -173,7 +173,8 @@ ingestApp.post('/ingest/mock', mtlsAuth, apiKeyAuth, async (req, res) => {
 });
 
 outputApp.get('/output', apiKeyAuth, async (req, res) => {
-  const { from, to, eui } = req.query;
+  const { from, to } = req.query;
+  const eui = req.query.eui ?? req.query.EUI;
 
   if (!from || !to) {
     return res.status(400).json({ error: 'from and to query parameters are required' });
